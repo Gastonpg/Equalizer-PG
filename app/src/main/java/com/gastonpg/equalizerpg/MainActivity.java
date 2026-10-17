@@ -659,7 +659,7 @@ public class MainActivity extends Activity {
             p.setStyle(Paint.Style.STROKE);
             for (int i=0;i<5;i++) {
                 p.setStrokeWidth(dp(i==0 ? 3 : 2));
-                p.setShader(new SweepGradient(cx,cy,new int[]{cyan,accent,pink,cyan}, phase*20+i*20));
+                p.setShader(new SweepGradient(cx,cy,new int[]{cyan,accent,pink,cyan}, null));
                 float rr = r*(.25f+i*.13f) + (float)Math.sin(phase+i*.7f)*dp(2);
                 canvas.drawCircle(cx,cy,rr,p);
             }
