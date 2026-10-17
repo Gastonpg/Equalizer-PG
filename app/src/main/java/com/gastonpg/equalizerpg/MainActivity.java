@@ -239,13 +239,13 @@ public class MainActivity extends Activity {
                 LinearLayout band = new LinearLayout(this);
                 band.setOrientation(LinearLayout.VERTICAL);
                 band.setGravity(Gravity.CENTER_HORIZONTAL);
-                short current = systemEqualizer.getBandLevel(i);
-                TextView val = text(String.format(java.util.Locale.US, "%+.1f", current / 100f), 9, muted, false);
+                short currentLevel = systemEqualizer.getBandLevel(i);
+                TextView val = text(String.format(java.util.Locale.US, "%+.1f", currentLevel / 100f), 9, muted, false);
                 val.setGravity(Gravity.CENTER);
                 band.addView(val, new LinearLayout.LayoutParams(-1, dp(17)));
                 SeekBar seek = new SeekBar(this);
                 seek.setMax(nativeMaxLevel - nativeMinLevel);
-                seek.setProgress(current - nativeMinLevel);
+                seek.setProgress(currentLevel - nativeMinLevel);
                 seek.setRotation(-90f);
                 seek.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
                 seek.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
