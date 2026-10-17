@@ -75,7 +75,7 @@ public class AudioEngineService extends Service {
         short count = equalizer.getNumberOfBands();
         if (count <= 0) return;
         int[] centers = {31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
-        int[] rangeDb = equalizer.getBandLevelRange();
+        short[] rangeDb = equalizer.getBandLevelRange();
         for (short b = 0; b < count; b++) {
             int[] range = equalizer.getBandFreqRange(b);
             int nativeCenterHz = (range[0] + range[1]) / 2000;
