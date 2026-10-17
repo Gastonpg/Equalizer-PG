@@ -29,7 +29,7 @@ public class AudioEngineService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        bandLevels = new short[10];
+        bandLevels = new short[]{-200, 100, 100, -100, 0, 0, 100, 100, 100, 0};
         createChannel();
     }
 
@@ -75,22 +75,21 @@ public class AudioEngineService extends Service {
         short count = equalizer.getNumberOfBands();
         if (count <= 0) return;
         int[] centers = {31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
-        for (int i = 0; i < centers.length; i++) {
-            short nearest = 0;
-            long best = Long.MAX_VALUE;
-            for (short b = 0; b < count; b++) {
-                int[] range = equalizer.getBandFreqRange(b);
-                int center = (range[0] + range[1]) / 2;
-                long distance = Math.abs((long) center - centers[i] * 1000L);
+        int[] rangeDb = equalizer.getBandLevelRange();
+        for (short b = 0; b < count; b++) {
+            int[] range = equalizer.getBandFreqRange(b);
+            int nativeCenterHz = (range[0] + range[1]) / 2000;
+            int nearestIndex = 0;
+            double best = Double.MAX_VALUE;
+            for (int i = 0; i < centers.length; i++) {
+                double distance = Math.abs(Math.log(Math.max(1, nativeCenterHz) / (double) centers[i]));
                 if (distance < best) {
                     best = distance;
-                    nearest = b;
+                    nearestIndex = i;
                 }
             }
-            int min = equalizer.getBandLevelRange()[0];
-            int max = equalizer.getBandLevelRange()[1];
-            int level = Math.max(min, Math.min(max, bandLevels[i]));
-            try { equalizer.setBandLevel(nearest, (short) level); } catch (IllegalArgumentException ignored) {}
+            int level = Math.max(rangeDb[0], Math.min(rangeDb[1], bandLevels[nearestIndex]));
+            equalizer.setBandLevel(b, (short) level);
         }
         // Android's Equalizer effect has no standard preamp control; retained for DSP integration.
     }
