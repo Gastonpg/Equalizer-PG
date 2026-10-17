@@ -3,6 +3,13 @@ package com.gastonpg.equalizerpg;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.LinearGradient;
+import android.graphics.SweepGradient;
+import android.os.Handler;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -15,11 +22,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
-    private final int bg = Color.rgb(9, 11, 18);
-    private final int panel = Color.rgb(20, 23, 35);
-    private final int panel2 = Color.rgb(27, 30, 45);
-    private final int accent = Color.rgb(158, 143, 255);
-    private final int muted = Color.rgb(151, 158, 180);
+    private final int bg = Color.rgb(8, 9, 19);
+    private final int panel = Color.rgb(21, 23, 43);
+    private final int panel2 = Color.rgb(29, 31, 57);
+    private final int accent = Color.rgb(168, 132, 255);
+    private final int cyan = Color.rgb(81, 224, 255);
+    private final int pink = Color.rgb(255, 104, 195);
+    private final int muted = Color.rgb(163, 169, 195);
     private boolean enabled = true;
     private String selectedProfile = "Mi sonido";
     private LinearLayout root;
@@ -52,10 +61,8 @@ public class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setOrientation(LinearLayout.HORIZONTAL);
-        TextView logo = text("PG", 16, Color.WHITE, true);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackground(shape(accent, 16));
-        header.addView(logo, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        HeadphoneLogo logo = new HeadphoneLogo();
+        header.addView(logo, new LinearLayout.LayoutParams(dp(52), dp(52)));
         LinearLayout titleStack = new LinearLayout(this);
         titleStack.setOrientation(LinearLayout.VERTICAL);
         titleStack.setPadding(dp(12), 0, 0, 0);
@@ -73,6 +80,7 @@ public class MainActivity extends Activity {
         page.addView(header);
 
         LinearLayout hero = card();
+        hero.setBackground(glassGradient(26));
         hero.setOrientation(LinearLayout.VERTICAL);
         hero.setPadding(dp(18), dp(18), dp(18), dp(18));
         LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(-1, -2);
@@ -97,11 +105,19 @@ public class MainActivity extends Activity {
         });
         hero.addView(heroTop);
 
-        TextView heroTitle = text("Dale forma\na tu sonido.", 30, Color.WHITE, true);
+        LinearLayout heroVisual = new LinearLayout(this);
+        heroVisual.setGravity(Gravity.CENTER_VERTICAL);
+        heroVisual.setOrientation(LinearLayout.HORIZONTAL);
+        TextView heroTitle = text("Dale forma\na tu sonido.", 29, Color.WHITE, true);
         heroTitle.setLineSpacing(dp(1), 1f);
+        heroVisual.addView(heroTitle, new LinearLayout.LayoutParams(0, -2, 1));
+        WaveOrb orb = new WaveOrb();
+        LinearLayout.LayoutParams orbLp = new LinearLayout.LayoutParams(dp(104), dp(104));
+        orbLp.leftMargin = dp(4);
+        heroVisual.addView(orb, orbLp);
         LinearLayout.LayoutParams heroTitleLp = new LinearLayout.LayoutParams(-1, -2);
-        heroTitleLp.topMargin = dp(20);
-        hero.addView(heroTitle, heroTitleLp);
+        heroTitleLp.topMargin = dp(13);
+        hero.addView(heroVisual, heroTitleLp);
         TextView heroDesc = text("Perfiles diseñados para sentir cada detalle.", 13, muted, false);
         LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
         descLp.topMargin = dp(9);
@@ -175,6 +191,7 @@ public class MainActivity extends Activity {
         page.addView(eqTitle, eqTitleLp);
         page.addView(text("Vista previa de las bandas • −12 dB a +12 dB", 12, muted, false));
         LinearLayout eqCard = card();
+        eqCard.setBackground(glassGradient(22));
         eqCard.setPadding(dp(12), dp(16), dp(12), dp(14));
         LinearLayout.LayoutParams eqLp = new LinearLayout.LayoutParams(-1, -2);
         eqLp.topMargin = dp(13);
@@ -269,13 +286,13 @@ public class MainActivity extends Activity {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setPadding(dp(13), dp(12), dp(12), dp(12));
-            row.setBackground(shape(panel, 18));
+            row.setBackground(glassGradient(18));
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
             rowLp.bottomMargin = dp(8);
             profileList.addView(row, rowLp);
             TextView icon = text(item[2], 18, accent, true);
             icon.setGravity(Gravity.CENTER);
-            icon.setBackground(shape(panel2, 14));
+            icon.setBackground(colorGlowShape(14));
             row.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
             LinearLayout info = new LinearLayout(this);
             info.setOrientation(LinearLayout.VERTICAL);
@@ -308,7 +325,7 @@ public class MainActivity extends Activity {
     private LinearLayout card() {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
-        c.setBackground(shape(panel, 24));
+        c.setBackground(glassGradient(24));
         return c;
     }
 
@@ -327,8 +344,113 @@ public class MainActivity extends Activity {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
         d.setCornerRadius(dp(radius));
-        d.setStroke(dp(1), Color.rgb(43, 45, 63));
+        d.setStroke(dp(1), Color.argb(90, 151, 158, 205));
         return d;
+    }
+
+    private GradientDrawable glassGradient(int radius) {
+        GradientDrawable d = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(43, 37, 76), Color.rgb(24, 31, 58), Color.rgb(20, 23, 42)});
+        d.setCornerRadius(dp(radius));
+        d.setStroke(dp(1), Color.argb(105, 157, 164, 235));
+        return d;
+    }
+
+    private GradientDrawable colorGlowShape(int radius) {
+        GradientDrawable d = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(80, 63, 137), Color.rgb(33, 67, 94), Color.rgb(48, 37, 76)});
+        d.setCornerRadius(dp(radius));
+        d.setStroke(dp(1), Color.argb(130, 111, 209, 255));
+        return d;
+    }
+
+    private class HeadphoneLogo extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        HeadphoneLogo() { super(MainActivity.this); setLayerType(View.LAYER_TYPE_SOFTWARE, null); }
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth(), h = getHeight();
+            p.setShader(new LinearGradient(0, 0, w, h, new int[]{accent, pink, cyan}, null, Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(new RectF(1, 1, w - 1, h - 1), dp(17), dp(17), p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(2));
+            p.setColor(Color.argb(210, 245, 243, 255));
+            RectF arc = new RectF(w * .24f, h * .12f, w * .76f, h * .72f);
+            canvas.drawArc(arc, 190, 160, false, p);
+            p.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(w * .18f, h * .43f, w * .31f, h * .72f, dp(4), dp(4), p);
+            canvas.drawRoundRect(w * .69f, h * .43f, w * .82f, h * .72f, dp(4), dp(4), p);
+            p.setColor(Color.WHITE);
+            p.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
+            p.setTextSize(dp(15));
+            p.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText("PG", w / 2f, h * .64f, p);
+        }
+    }
+
+    private class WaveOrb extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Handler handler = new Handler();
+        private float phase = 0f;
+        private final Runnable animator = new Runnable() {
+            @Override public void run() {
+                phase += .12f;
+                if (phase > 1000f) phase = 0f;
+                invalidate();
+                handler.postDelayed(this, 45);
+            }
+        };
+        WaveOrb() { super(MainActivity.this); setLayerType(View.LAYER_TYPE_SOFTWARE, null); }
+        @Override protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            handler.post(animator);
+        }
+        @Override protected void onDetachedFromWindow() {
+            handler.removeCallbacks(animator);
+            super.onDetachedFromWindow();
+        }
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            float r = Math.min(cx, cy) * .82f;
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new SweepGradient(cx, cy, new int[]{accent, cyan, pink, accent}, null));
+            canvas.drawCircle(cx, cy, r * .92f, p);
+            p.setShader(null);
+            p.setColor(Color.rgb(19, 22, 43));
+            canvas.drawCircle(cx, cy, r * .78f, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(1));
+            p.setColor(Color.argb(100, 203, 218, 255));
+            canvas.drawCircle(cx, cy, r * .65f, p);
+            canvas.drawCircle(cx, cy, r * .49f, p);
+            p.setStyle(Paint.Style.FILL);
+            int bars = 36;
+            for (int i = 0; i < bars; i++) {
+                double a = (Math.PI * 2 * i / bars) + phase * .12;
+                float pulse = (float) (Math.sin(i * .78 + phase) * .5 + .5);
+                float inner = r * (.43f + pulse * .07f);
+                float outer = inner + dp(4) + pulse * dp(9);
+                float x1 = cx + (float) Math.cos(a) * inner;
+                float y1 = cy + (float) Math.sin(a) * inner;
+                float x2 = cx + (float) Math.cos(a) * outer;
+                float y2 = cy + (float) Math.sin(a) * outer;
+                p.setStrokeWidth(dp(2));
+                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setShader(new LinearGradient(x1, y1, x2, y2, new int[]{cyan, pink, accent}, null, Shader.TileMode.CLAMP));
+                canvas.drawLine(x1, y1, x2, y2, p);
+            }
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.WHITE);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            p.setTextSize(dp(10));
+            canvas.drawText("PG", cx, cy + dp(4), p);
+        }
     }
 
     private int dp(int value) {
