@@ -258,6 +258,26 @@ public class MainActivity extends Activity {
                 TextView freq = text(freqLabel, 9, muted, false);
                 freq.setGravity(Gravity.CENTER);
                 band.addView(freq, new LinearLayout.LayoutParams(-1, dp(20)));
+                seek.setFocusable(true);
+                seek.setFocusableInTouchMode(true);
+                seek.setOnKeyListener((view, keyCode, event) -> {
+                    if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+                    if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP ||
+                        keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                        int delta = Math.max(1, Math.round((nativeMaxLevel - nativeMinLevel) / 24f));
+                        int direction = keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP ? 1 : -1;
+                        seek.setProgress(Math.max(0, Math.min(seek.getMax(), seek.getProgress() + direction * delta)));
+                        return true;
+                    }
+                    if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT ||
+                        keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        int direction = keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? View.FOCUS_LEFT : View.FOCUS_RIGHT;
+                        View next = seek.focusSearch(direction);
+                        if (next != null) next.requestFocus();
+                        return true;
+                    }
+                    return false;
+                });
                 seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                     @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                         short level = (short) (nativeMinLevel + progress);
@@ -306,8 +326,51 @@ public class MainActivity extends Activity {
 
         screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
         setContentView(screen);
+        // Make every interactive control usable and visibly focused with an Android TV D-pad.
+        applyTvFocus(screen);
     }
 
+
+    /**
+     * TV-friendly D-pad focus: a clear neon/glass outline, a subtle scale lift,
+     * and real keyboard navigation instead of relying on touch feedback alone.
+     */
+    private void applyTvFocus(View view) {
+        if (view == null) return;
+        if (view.isClickable() || view instanceof SeekBar) {
+            view.setFocusable(true);
+            view.setFocusableInTouchMode(true);
+            final android.graphics.drawable.Drawable originalBackground = view.getBackground();
+            view.setOnFocusChangeListener((focusedView, hasFocus) -> {
+                if (hasFocus) {
+                    focusedView.setBackground(focusGlowShape(12));
+                    focusedView.setScaleX(1.025f);
+                    focusedView.setScaleY(1.025f);
+                    focusedView.setElevation(dp(7));
+                } else {
+                    focusedView.setBackground(originalBackground);
+                    focusedView.setScaleX(1f);
+                    focusedView.setScaleY(1f);
+                    focusedView.setElevation(0f);
+                }
+            });
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyTvFocus(group.getChildAt(i));
+            }
+        }
+    }
+
+    private GradientDrawable focusGlowShape(int radius) {
+        GradientDrawable d = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.argb(235, 70, 57, 119), Color.argb(235, 22, 62, 84)});
+        d.setCornerRadius(dp(radius));
+        d.setStroke(dp(2), Color.rgb(81, 224, 255));
+        return d;
+    }
 
     private void initializeAudioEngine() {
         try {
@@ -413,7 +476,7 @@ public class MainActivity extends Activity {
     private void showBackgroundSettings() {
         new AlertDialog.Builder(this)
                 .setTitle("Mantener Equalizer PG activo")
-                .setMessage("Para que el ecualizador no se cierre al salir de la app, permití el uso sin restricciones de batería. En Xiaomi/POCO también puede hacer falta activar Inicio automático y elegir «Sin restricciones» en Ahorro de batería desde la información de la aplicación. La notificación persistente indica que el servicio está en primer plano.")
+                .setMessage("Para mantener el audio activo en segundo plano, revisá los permisos de energía del dispositivo. En esta TV Box la opción puede estar en Ajustes > Aplicaciones > Equalizer PG > Batería, Ahorro de energía o Ejecución en segundo plano. Si no aparece «Sin restricciones», el fabricante puede no ofrecer ese control. La notificación persistente depende también de cómo la ROM gestione los servicios en primer plano.")
                 .setPositiveButton("Abrir ajustes de la app", (dialog, which) -> {
                     try {
                         Intent details = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
