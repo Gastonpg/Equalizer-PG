@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
         titleStack.setOrientation(LinearLayout.VERTICAL);
         titleStack.setPadding(dp(12), 0, 0, 0);
         titleStack.addView(text("EQUALIZER PG", 14, Color.WHITE, true));
-        TextView subtitle = text("Tu sonido, a tu manera", 12, muted, false);
+        TextView subtitle = text("PG Pods  •  Tu sonido, a tu manera", 11, muted, false);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-2, -2);
         subLp.topMargin = dp(3);
         titleStack.addView(subtitle, subLp);
