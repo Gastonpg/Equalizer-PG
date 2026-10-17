@@ -108,7 +108,7 @@ public class AudioEngineService extends Service {
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
         return builder.setContentTitle("Equalizer PG")
                 .setContentText(status)
-                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setSmallIcon(R.drawable.ic_notification_pg)
                 .setOngoing(true)
                 .build();
     }
