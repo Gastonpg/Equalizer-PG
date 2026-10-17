@@ -432,8 +432,13 @@ public class MainActivity extends Activity {
         if (index >= 0) intent.putExtra(AudioEngineService.EXTRA_INDEX, index);
         intent.putExtra(AudioEngineService.EXTRA_LEVEL, level);
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
-            else startService(intent);
+            if (AudioEngineService.ACTION_STOP.equals(action)) {
+                startService(intent);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
         } catch (RuntimeException error) {
             Toast.makeText(this, "Android no permitió iniciar el motor de audio", Toast.LENGTH_LONG).show();
         }
