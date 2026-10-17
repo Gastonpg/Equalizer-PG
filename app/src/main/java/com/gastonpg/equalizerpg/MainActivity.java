@@ -13,6 +13,7 @@ import android.graphics.Shader;
 import android.graphics.LinearGradient;
 import android.graphics.SweepGradient;
 import android.os.Handler;
+import android.media.audiofx.Equalizer;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -42,6 +43,9 @@ public class MainActivity extends Activity {
     private LinearLayout profileList;
     private String activeCategory = "Para vos";
     private String visualizerStyle = "Liquid Orb";
+    private Equalizer systemEqualizer;
+    private short nativeMinLevel = -1200;
+    private short nativeMaxLevel = 1200;
 
     @Override
     public void onCreate(Bundle state) {
@@ -49,6 +53,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
         visualizerStyle = getPreferences(MODE_PRIVATE).getString("visualizer_style", "Liquid Orb");
+        initializeAudioEngine();
         buildHome();
     }
 
@@ -105,7 +110,7 @@ public class MainActivity extends Activity {
         LinearLayout heroTop = new LinearLayout(this);
         heroTop.setGravity(Gravity.CENTER_VERTICAL);
         heroTop.setOrientation(LinearLayout.HORIZONTAL);
-        TextView tag = text("●  PROCESAMIENTO DE AUDIO", 10, accent, true);
+        TextView tag = text("●  ECUALIZADOR DEL SISTEMA", 10, accent, true);
         heroTop.addView(tag, new LinearLayout.LayoutParams(0, -2, 1));
         powerButton = text(enabled ? "ON" : "OFF", 11, enabled ? Color.BLACK : muted, true);
         powerButton.setGravity(Gravity.CENTER);
@@ -141,7 +146,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams heroTitleLp = new LinearLayout.LayoutParams(-1, -2);
         heroTitleLp.topMargin = dp(13);
         hero.addView(heroVisual, heroTitleLp);
-        TextView heroDesc = text("Perfiles diseñados para sentir cada detalle.", 13, muted, false);
+        TextView heroDesc = text("Prueba real del ecualizador de Android. El efecto global depende del dispositivo.", 13, muted, false);
         LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
         descLp.topMargin = dp(9);
         hero.addView(heroDesc, descLp);
@@ -212,7 +217,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams eqTitleLp = new LinearLayout.LayoutParams(-1, -2);
         eqTitleLp.topMargin = dp(27);
         page.addView(eqTitle, eqTitleLp);
-        page.addView(text("Vista previa de las bandas • −12 dB a +12 dB", 12, muted, false));
+        page.addView(text("Bandas de audio reales • −12 dB a +12 dB", 12, muted, false));
         LinearLayout eqCard = card();
         eqCard.setBackground(glassGradient(22));
         eqCard.setPadding(dp(12), dp(16), dp(12), dp(14));
@@ -223,59 +228,59 @@ public class MainActivity extends Activity {
         LinearLayout bands = new LinearLayout(this);
         bands.setGravity(Gravity.CENTER);
         bands.setOrientation(LinearLayout.HORIZONTAL);
-        int[] values = {-2, 1, 1, -1, 0, 0, 1, 1, 1, 0};
-        String[] freqs = {"31", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"};
-        for (int i = 0; i < freqs.length; i++) {
-            LinearLayout band = new LinearLayout(this);
-            band.setOrientation(LinearLayout.VERTICAL);
-            band.setGravity(Gravity.CENTER_HORIZONTAL);
-            TextView val = text((values[i] > 0 ? "+" : "") + values[i], 9, muted, false);
-            val.setGravity(Gravity.CENTER);
-            band.addView(val, new LinearLayout.LayoutParams(-1, dp(17)));
-            SeekBar seek = new SeekBar(this);
-            seek.setMax(24);
-            seek.setProgress(values[i] + 12);
-            seek.setRotation(-90f);
-            seek.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
-            seek.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
-            seek.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(60, 62, 81)));
-            final int bandIndex = i;
-            seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                    val.setText((progress - 12 > 0 ? "+" : "") + (progress - 12));
-                    if (fromUser && enabled) startAudioEngine(AudioEngineService.ACTION_BAND, bandIndex, (progress - 12) * 100);
-                }
-                @Override public void onStartTrackingTouch(SeekBar bar) {}
-                @Override public void onStopTrackingTouch(SeekBar bar) {}
-            });
-            LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(dp(76), dp(32));
-            seekLp.topMargin = dp(34);
-            seekLp.bottomMargin = dp(34);
-            band.addView(seek, seekLp);
-            TextView freq = text(freqs[i], 9, muted, false);
-            freq.setGravity(Gravity.CENTER);
-            band.addView(freq, new LinearLayout.LayoutParams(-1, dp(20)));
-            LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(0, dp(140), 1);
-            bands.addView(band, bandLp);
+        if (systemEqualizer != null) {
+            short bandCount = systemEqualizer.getNumberOfBands();
+            nativeMinLevel = systemEqualizer.getBandLevelRange()[0];
+            nativeMaxLevel = systemEqualizer.getBandLevelRange()[1];
+            for (short i = 0; i < bandCount; i++) {
+                final short bandId = i;
+                int centerHz = systemEqualizer.getCenterFreq(i) / 1000;
+                String freqLabel = centerHz >= 1000 ? (centerHz % 1000 == 0 ? (centerHz / 1000) + "k" : String.format(java.util.Locale.US, "%.1fk", centerHz / 1000f)) : String.valueOf(centerHz);
+                LinearLayout band = new LinearLayout(this);
+                band.setOrientation(LinearLayout.VERTICAL);
+                band.setGravity(Gravity.CENTER_HORIZONTAL);
+                short current = systemEqualizer.getBandLevel(i);
+                TextView val = text(String.format(java.util.Locale.US, "%+.1f", current / 100f), 9, muted, false);
+                val.setGravity(Gravity.CENTER);
+                band.addView(val, new LinearLayout.LayoutParams(-1, dp(17)));
+                SeekBar seek = new SeekBar(this);
+                seek.setMax(nativeMaxLevel - nativeMinLevel);
+                seek.setProgress(current - nativeMinLevel);
+                seek.setRotation(-90f);
+                seek.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
+                seek.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+                seek.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(60, 62, 81)));
+                LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(dp(76), dp(32));
+                seekLp.topMargin = dp(34);
+                seekLp.bottomMargin = dp(34);
+                band.addView(seek, seekLp);
+                TextView freq = text(freqLabel, 9, muted, false);
+                freq.setGravity(Gravity.CENTER);
+                band.addView(freq, new LinearLayout.LayoutParams(-1, dp(20)));
+                seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                        short level = (short) (nativeMinLevel + progress);
+                        val.setText(String.format(java.util.Locale.US, "%+.1f", level / 100f));
+                        if (fromUser && systemEqualizer != null) {
+                            try { systemEqualizer.setBandLevel(bandId, level); }
+                            catch (Exception e) { Toast.makeText(MainActivity.this, "El sistema rechazó este ajuste", Toast.LENGTH_SHORT).show(); }
+                        }
+                    }
+                    @Override public void onStartTrackingTouch(SeekBar bar) {}
+                    @Override public void onStopTrackingTouch(SeekBar bar) {}
+                });
+                LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(0, dp(140), 1);
+                bands.addView(band, bandLp);
+            }
+        } else {
+            TextView unavailable = text("El dispositivo no expuso un ecualizador global compatible. Revisá el estado del motor.", 12, muted, false);
+            bands.addView(unavailable);
         }
         eqCard.addView(bands);
-        TextView preamp = text("PREAMP", 10, muted, true);
+        TextView preampNote = text("Preamp paramétrico y bandas Q: siguiente etapa del motor DSP propio.", 11, muted, false);
         LinearLayout.LayoutParams preLp = new LinearLayout.LayoutParams(-1, -2);
-        preLp.topMargin = dp(15);
-        eqCard.addView(preamp, preLp);
-        SeekBar pre = new SeekBar(this);
-        pre.setMax(24);
-        pre.setProgress(10);
-        pre.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
-        pre.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
-        pre.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                if (fromUser && enabled) startAudioEngine(AudioEngineService.ACTION_PREAMP, -1, (progress - 12) * 100);
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) {}
-            @Override public void onStopTrackingTouch(SeekBar bar) {}
-        });
-        eqCard.addView(pre, new LinearLayout.LayoutParams(-1, dp(34)));
+        preLp.topMargin = dp(12);
+        eqCard.addView(preampNote, preLp);
 
         LinearLayout footer = new LinearLayout(this);
         footer.setGravity(Gravity.CENTER);
@@ -300,6 +305,37 @@ public class MainActivity extends Activity {
 
         screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
         setContentView(screen);
+    }
+
+
+    private void initializeAudioEngine() {
+        try {
+            systemEqualizer = new Equalizer(0, 0);
+            systemEqualizer.setEnabled(enabled);
+            short[] range = systemEqualizer.getBandLevelRange();
+            nativeMinLevel = range[0];
+            nativeMaxLevel = range[1];
+        } catch (Throwable error) {
+            systemEqualizer = null;
+        }
+    }
+
+    private void setAudioEnabled(boolean active) {
+        if (systemEqualizer == null) {
+            Toast.makeText(this, "Este dispositivo no permite iniciar el ecualizador global", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            systemEqualizer.setEnabled(active);
+        } catch (Exception error) {
+            Toast.makeText(this, "No se pudo cambiar el estado del ecualizador", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        // No liberar el efecto aquí: el siguiente paso es mover su ciclo de vida a un servicio.
+        super.onDestroy();
     }
 
     private void populateProfiles() {
