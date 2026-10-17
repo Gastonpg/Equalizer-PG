@@ -617,7 +617,7 @@ public class MainActivity extends Activity {
         private void drawBars(Canvas canvas, float cx, float cy, float r, boolean neon) {
             p.setStyle(Paint.Style.FILL); p.setColor(Color.argb(225, 17, 20, 42));
             canvas.drawRoundRect(new RectF(cx-r, cy-r*.76f, cx+r, cy+r*.76f), dp(18), dp(18), p);
-            int count = 17; float gap = dp(2.5f), bw = (r * 1.55f - gap * (count-1)) / count;
+            int count = 17; float gap = dp(3), bw = (r * 1.55f - gap * (count-1)) / count;
             for (int i=0; i<count; i++) {
                 float h = dp(8) + (float)(Math.abs(Math.sin(i*.7 + phase*.7)) * r * (neon ? .85f : .68f));
                 float x = cx - (count*bw+(count-1)*gap)/2f + i*(bw+gap);
@@ -658,7 +658,7 @@ public class MainActivity extends Activity {
             p.setColor(Color.argb(225,17,20,42)); canvas.drawCircle(cx,cy,r*.9f,p);
             p.setStyle(Paint.Style.STROKE);
             for (int i=0;i<5;i++) {
-                p.setStrokeWidth(dp(i==0 ? 3 : 1.5f));
+                p.setStrokeWidth(dp(i==0 ? 3 : 2));
                 p.setShader(new SweepGradient(cx,cy,new int[]{cyan,accent,pink,cyan}, phase*20+i*20));
                 float rr = r*(.25f+i*.13f) + (float)Math.sin(phase+i*.7f)*dp(2);
                 canvas.drawCircle(cx,cy,rr,p);
