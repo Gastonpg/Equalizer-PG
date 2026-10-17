@@ -96,7 +96,7 @@ public class MainActivity extends Activity {
         settings.setGravity(Gravity.CENTER);
         settings.setBackground(shape(panel2, 16));
         header.addView(settings, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        settings.setOnClickListener(v -> Toast.makeText(this, "Ajustes: próximamente", Toast.LENGTH_SHORT).show());
+        settings.setOnClickListener(v -> showBackgroundSettings());
         page.addView(header);
 
         LinearLayout hero = card();
@@ -122,6 +122,7 @@ public class MainActivity extends Activity {
             powerButton.setTextColor(enabled ? Color.BLACK : muted);
             powerButton.setBackground(shape(enabled ? accent : panel2, 18));
             if (enabled) {
+                requestBackgroundPermissionIfNeeded();
                 startAudioEngine(AudioEngineService.ACTION_START, -1, 0);
                 Toast.makeText(this, "Intentando activar el ecualizador del sistema", Toast.LENGTH_SHORT).show();
             } else {
@@ -392,6 +393,37 @@ public class MainActivity extends Activity {
                 buildHome();
             });
         }
+    }
+
+    private void requestBackgroundPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            android.os.PowerManager powerManager = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
+                try {
+                    Intent request = new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    request.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(request);
+                } catch (Exception e) {
+                    showBackgroundSettings();
+                }
+            }
+        }
+    }
+
+    private void showBackgroundSettings() {
+        new AlertDialog.Builder(this)
+                .setTitle("Mantener Equalizer PG activo")
+                .setMessage("Para que el ecualizador no se cierre al salir de la app, permití el uso sin restricciones de batería. En Xiaomi/POCO también puede hacer falta activar Inicio automático y elegir «Sin restricciones» en Ahorro de batería desde la información de la aplicación. La notificación persistente indica que el servicio está en primer plano.")
+                .setPositiveButton("Abrir ajustes de la app", (dialog, which) -> {
+                    try {
+                        Intent details = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        details.setData(android.net.Uri.parse("package:" + getPackageName()));
+                        startActivity(details);
+                    } catch (Exception ignored) {}
+                })
+                .setNeutralButton("Permitir batería", (dialog, which) -> requestBackgroundPermissionIfNeeded())
+                .setNegativeButton("Cerrar", null)
+                .show();
     }
 
     private void startAudioEngine(String action, int index, int level) {
