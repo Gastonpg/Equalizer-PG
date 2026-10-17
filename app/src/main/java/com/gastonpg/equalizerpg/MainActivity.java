@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -32,6 +33,7 @@ public class MainActivity extends Activity {
     private boolean enabled = true;
     private String selectedProfile = "Mi sonido";
     private LinearLayout root;
+    private SynthwaveBackground synthwaveBackground;
     private TextView powerButton;
     private TextView activeName;
     private LinearLayout profileList;
@@ -46,16 +48,24 @@ public class MainActivity extends Activity {
     }
 
     private void buildHome() {
+        FrameLayout screen = new FrameLayout(this);
+        synthwaveBackground = new SynthwaveBackground();
+        screen.addView(synthwaveBackground, new FrameLayout.LayoutParams(-1, -1));
+
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(bg);
+        root.setBackgroundColor(Color.TRANSPARENT);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Color.TRANSPARENT);
+        scroll.setClipToPadding(false);
         scroll.setFillViewport(true);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(20), dp(18), dp(20), dp(26));
         scroll.addView(page);
+        scroll.setOnScrollChangeListener((View v, int sx, int sy, int oldSx, int oldSy) ->
+                synthwaveBackground.setScrollOffset(sy));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         LinearLayout header = new LinearLayout(this);
@@ -259,7 +269,8 @@ public class MainActivity extends Activity {
         footerLp.setMargins(dp(16), dp(6), dp(16), dp(10));
         footer.setLayoutParams(footerLp);
 
-        setContentView(root);
+        screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
+        setContentView(screen);
     }
 
     private void populateProfiles() {
@@ -351,7 +362,7 @@ public class MainActivity extends Activity {
     private GradientDrawable glassGradient(int radius) {
         GradientDrawable d = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(43, 37, 76), Color.rgb(24, 31, 58), Color.rgb(20, 23, 42)});
+                new int[]{Color.argb(224, 43, 37, 76), Color.argb(222, 24, 31, 58), Color.argb(230, 14, 17, 34)});
         d.setCornerRadius(dp(radius));
         d.setStroke(dp(1), Color.argb(105, 157, 164, 235));
         return d;
@@ -364,6 +375,133 @@ public class MainActivity extends Activity {
         d.setCornerRadius(dp(radius));
         d.setStroke(dp(1), Color.argb(130, 111, 209, 255));
         return d;
+    }
+
+
+    /**
+     * Original OutRun-inspired landscape, drawn locally so it works offline.
+     * A restrained parallax shift gives the glass UI a foreground/depth feel.
+     */
+    private class SynthwaveBackground extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float scrollOffset = 0f;
+
+        SynthwaveBackground() {
+            super(MainActivity.this);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        void setScrollOffset(int value) {
+            scrollOffset = value;
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+
+            // Deep navy-to-violet night sky.
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[]{Color.rgb(9, 10, 27), Color.rgb(29, 13, 54),
+                            Color.rgb(61, 19, 79), Color.rgb(10, 13, 30)},
+                    new float[]{0f, .43f, .67f, 1f}, Shader.TileMode.CLAMP));
+            canvas.drawRect(0, 0, w, h, p);
+            p.setShader(null);
+
+            // Sparse stars, intentionally subtle.
+            p.setColor(Color.argb(125, 177, 208, 255));
+            for (int i = 0; i < 34; i++) {
+                float x = ((i * 97f) % Math.max(1f, w));
+                float y = ((i * 53f) % Math.max(1f, h * .43f));
+                canvas.drawCircle(x, y, (i % 4 == 0) ? dp(1) : dp(1), p);
+            }
+
+            // Magenta sun with thin horizontal cut-outs.
+            float sunX = w * .76f;
+            float sunY = h * .36f - scrollOffset * .035f;
+            float sunR = Math.min(w, h) * .19f;
+            p.setShader(new LinearGradient(sunX, sunY - sunR, sunX, sunY + sunR,
+                    new int[]{Color.rgb(255, 104, 195), Color.rgb(176, 80, 237),
+                            Color.rgb(92, 82, 224)}, null, Shader.TileMode.CLAMP));
+            canvas.drawCircle(sunX, sunY, sunR, p);
+            p.setShader(null);
+            p.setColor(Color.rgb(31, 15, 53));
+            for (int i = 0; i < 7; i++) {
+                float yy = sunY + sunR * .22f + i * dp(4);
+                float hh = (i < 3) ? dp(2) : dp(3);
+                canvas.drawRect(sunX - sunR, yy, sunX + sunR, yy + hh, p);
+            }
+
+            // Layered angular mountains: distant cyan-violet ridge, then dark foreground ridge.
+            float mountainShift = scrollOffset * .055f;
+            p.setShader(new LinearGradient(0, h * .38f, 0, h * .73f,
+                    new int[]{Color.rgb(63, 53, 130), Color.rgb(18, 26, 62)},
+                    null, Shader.TileMode.CLAMP));
+            android.graphics.Path distant = new android.graphics.Path();
+            distant.moveTo(0, h * .61f + mountainShift);
+            distant.lineTo(w * .10f, h * .49f + mountainShift);
+            distant.lineTo(w * .19f, h * .54f + mountainShift);
+            distant.lineTo(w * .34f, h * .40f + mountainShift);
+            distant.lineTo(w * .48f, h * .56f + mountainShift);
+            distant.lineTo(w * .62f, h * .46f + mountainShift);
+            distant.lineTo(w * .76f, h * .58f + mountainShift);
+            distant.lineTo(w * .89f, h * .47f + mountainShift);
+            distant.lineTo(w, h * .55f + mountainShift);
+            distant.lineTo(w, h);
+            distant.lineTo(0, h);
+            distant.close();
+            canvas.drawPath(distant, p);
+            p.setShader(null);
+
+            p.setShader(new LinearGradient(0, h * .54f, 0, h,
+                    new int[]{Color.rgb(26, 18, 59), Color.rgb(7, 11, 27)},
+                    null, Shader.TileMode.CLAMP));
+            android.graphics.Path near = new android.graphics.Path();
+            near.moveTo(0, h * .68f - mountainShift * .4f);
+            near.lineTo(w * .16f, h * .59f - mountainShift * .4f);
+            near.lineTo(w * .29f, h * .68f - mountainShift * .4f);
+            near.lineTo(w * .43f, h * .56f - mountainShift * .4f);
+            near.lineTo(w * .60f, h * .67f - mountainShift * .4f);
+            near.lineTo(w * .78f, h * .57f - mountainShift * .4f);
+            near.lineTo(w, h * .66f - mountainShift * .4f);
+            near.lineTo(w, h);
+            near.lineTo(0, h);
+            near.close();
+            canvas.drawPath(near, p);
+            p.setShader(null);
+
+            // Horizon glow, softened so text/cards remain readable.
+            p.setShader(new LinearGradient(0, h * .56f, 0, h * .76f,
+                    new int[]{Color.argb(75, 255, 92, 210), Color.argb(0, 81, 224, 255)},
+                    null, Shader.TileMode.CLAMP));
+            canvas.drawRect(0, h * .55f, w, h * .78f, p);
+            p.setShader(null);
+
+            // Perspective neon grid, fading into the horizon.
+            float horizon = h * .68f - scrollOffset * .025f;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(1));
+            p.setColor(Color.argb(110, 81, 224, 255));
+            for (int i = 0; i < 11; i++) {
+                float t = i / 10f;
+                float y = horizon + (h - horizon) * t * t;
+                canvas.drawLine(0, y, w, y, p);
+            }
+            for (int i = -8; i <= 8; i++) {
+                float bottomX = w * .5f + i * w * .105f;
+                canvas.drawLine(w * .5f, horizon, bottomX, h, p);
+            }
+            p.setStyle(Paint.Style.FILL);
+
+            // Dark vignette overlay around the content edges for readable Liquid Glass panels.
+            p.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[]{Color.argb(35, 3, 5, 17), Color.argb(20, 5, 6, 19),
+                            Color.argb(112, 3, 5, 17)}, null, Shader.TileMode.CLAMP));
+            canvas.drawRect(0, 0, w, h, p);
+            p.setShader(null);
+        }
     }
 
     private class HeadphoneLogo extends View {
