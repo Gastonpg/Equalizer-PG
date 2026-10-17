@@ -2,6 +2,8 @@ package com.gastonpg.equalizerpg;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
+import android.os.Build;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.Canvas;
@@ -114,7 +116,13 @@ public class MainActivity extends Activity {
             powerButton.setText(enabled ? "ON" : "OFF");
             powerButton.setTextColor(enabled ? Color.BLACK : muted);
             powerButton.setBackground(shape(enabled ? accent : panel2, 18));
-            Toast.makeText(this, enabled ? "Ecualizador activado (vista previa)" : "Ecualizador desactivado", Toast.LENGTH_SHORT).show();
+            if (enabled) {
+                startAudioEngine(AudioEngineService.ACTION_START, -1, 0);
+                Toast.makeText(this, "Intentando activar el ecualizador del sistema", Toast.LENGTH_SHORT).show();
+            } else {
+                startAudioEngine(AudioEngineService.ACTION_STOP, -1, 0);
+                Toast.makeText(this, "Ecualizador desactivado", Toast.LENGTH_SHORT).show();
+            }
         });
         hero.addView(heroTop);
 
@@ -231,6 +239,15 @@ public class MainActivity extends Activity {
             seek.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
             seek.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
             seek.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(60, 62, 81)));
+            final int bandIndex = i;
+            seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                    val.setText((progress - 12 > 0 ? "+" : "") + (progress - 12));
+                    if (fromUser && enabled) startAudioEngine(AudioEngineService.ACTION_BAND, bandIndex, (progress - 12) * 100);
+                }
+                @Override public void onStartTrackingTouch(SeekBar bar) {}
+                @Override public void onStopTrackingTouch(SeekBar bar) {}
+            });
             LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(dp(76), dp(32));
             seekLp.topMargin = dp(34);
             seekLp.bottomMargin = dp(34);
@@ -251,6 +268,13 @@ public class MainActivity extends Activity {
         pre.setProgress(10);
         pre.setProgressTintList(android.content.res.ColorStateList.valueOf(accent));
         pre.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+        pre.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser && enabled) startAudioEngine(AudioEngineService.ACTION_PREAMP, -1, (progress - 12) * 100);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
         eqCard.addView(pre, new LinearLayout.LayoutParams(-1, dp(34)));
 
         LinearLayout footer = new LinearLayout(this);
@@ -331,6 +355,19 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, selectedProfile + " seleccionado (vista previa)", Toast.LENGTH_SHORT).show();
                 buildHome();
             });
+        }
+    }
+
+    private void startAudioEngine(String action, int index, int level) {
+        Intent intent = new Intent(this, AudioEngineService.class);
+        intent.setAction(action);
+        if (index >= 0) intent.putExtra(AudioEngineService.EXTRA_INDEX, index);
+        intent.putExtra(AudioEngineService.EXTRA_LEVEL, level);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
+            else startService(intent);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Android no permitió iniciar el motor de audio", Toast.LENGTH_LONG).show();
         }
     }
 
