@@ -7,6 +7,10 @@
         android:label="Equalizer PG"
         android:theme="@style/AppTheme"
         android:supportsRtl="true">
+        <service
+            android:name=".AudioEngineService"
+            android:enabled="true"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
