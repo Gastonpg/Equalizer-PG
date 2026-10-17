@@ -1,6 +1,7 @@
 package com.gastonpg.equalizerpg;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.Canvas;
@@ -38,12 +39,14 @@ public class MainActivity extends Activity {
     private TextView activeName;
     private LinearLayout profileList;
     private String activeCategory = "Para vos";
+    private String visualizerStyle = "Liquid Orb";
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
+        visualizerStyle = getPreferences(MODE_PRIVATE).getString("visualizer_style", "Liquid Orb");
         buildHome();
     }
 
@@ -122,6 +125,8 @@ public class MainActivity extends Activity {
         heroTitle.setLineSpacing(dp(1), 1f);
         heroVisual.addView(heroTitle, new LinearLayout.LayoutParams(0, -2, 1));
         WaveOrb orb = new WaveOrb();
+        orb.setOnClickListener(v -> showVisualizerPicker(orb));
+        orb.setContentDescription("Elegir estilo de visualizador: " + visualizerStyle);
         LinearLayout.LayoutParams orbLp = new LinearLayout.LayoutParams(dp(104), dp(104));
         orbLp.leftMargin = dp(4);
         heroVisual.addView(orb, orbLp);
@@ -331,6 +336,23 @@ public class MainActivity extends Activity {
 
     private void showEditor() {
         Toast.makeText(this, "Editor de perfiles y guardado: próxima etapa", Toast.LENGTH_LONG).show();
+    }
+
+    private void showVisualizerPicker(WaveOrb orb) {
+        String[] styles = {"Liquid Orb", "Spectrum Bars", "Waveform", "Pulse", "Neon Spectrum", "Liquid Rings"};
+        String[] descriptions = {"Círculo líquido multicolor (predeterminado)", "Barras de espectro en movimiento", "Onda horizontal animada", "Pulso suave que se expande", "Barras neón con degradado", "Anillos líquidos concéntricos"};
+        new AlertDialog.Builder(this)
+                .setTitle("Estilo de visualizador")
+                .setSingleChoiceItems(styles, java.util.Arrays.asList(styles).indexOf(visualizerStyle), (dialog, which) -> {
+                    visualizerStyle = styles[which];
+                    getPreferences(MODE_PRIVATE).edit().putString("visualizer_style", visualizerStyle).apply();
+                    orb.invalidate();
+                    orb.setContentDescription("Elegir estilo de visualizador: " + visualizerStyle);
+                    Toast.makeText(this, descriptions[which], Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cerrar", null)
+                .show();
     }
 
     private LinearLayout card() {
@@ -554,7 +576,19 @@ public class MainActivity extends Activity {
             super.onDraw(canvas);
             float cx = getWidth() / 2f, cy = getHeight() / 2f;
             float r = Math.min(cx, cy) * .82f;
+            p.setShader(null);
             p.setStyle(Paint.Style.FILL);
+            switch (visualizerStyle) {
+                case "Spectrum Bars": drawBars(canvas, cx, cy, r, false); break;
+                case "Waveform": drawWaveform(canvas, cx, cy, r); break;
+                case "Pulse": drawPulse(canvas, cx, cy, r); break;
+                case "Neon Spectrum": drawBars(canvas, cx, cy, r, true); break;
+                case "Liquid Rings": drawRings(canvas, cx, cy, r); break;
+                default: drawLiquidOrb(canvas, cx, cy, r); break;
+            }
+        }
+
+        private void drawLiquidOrb(Canvas canvas, float cx, float cy, float r) {
             p.setShader(new SweepGradient(cx, cy, new int[]{accent, cyan, pink, accent}, null));
             canvas.drawCircle(cx, cy, r * .92f, p);
             p.setShader(null);
@@ -566,28 +600,76 @@ public class MainActivity extends Activity {
             canvas.drawCircle(cx, cy, r * .65f, p);
             canvas.drawCircle(cx, cy, r * .49f, p);
             p.setStyle(Paint.Style.FILL);
-            int bars = 36;
-            for (int i = 0; i < bars; i++) {
-                double a = (Math.PI * 2 * i / bars) + phase * .12;
-                float pulse = (float) (Math.sin(i * .78 + phase) * .5 + .5);
-                float inner = r * (.43f + pulse * .07f);
-                float outer = inner + dp(4) + pulse * dp(9);
-                float x1 = cx + (float) Math.cos(a) * inner;
-                float y1 = cy + (float) Math.sin(a) * inner;
-                float x2 = cx + (float) Math.cos(a) * outer;
-                float y2 = cy + (float) Math.sin(a) * outer;
-                p.setStrokeWidth(dp(2));
-                p.setStrokeCap(Paint.Cap.ROUND);
+            for (int i = 0; i < 36; i++) {
+                double a = (Math.PI * 2 * i / 36) + phase * .12;
+                float pulse = (float)(Math.sin(i * .78 + phase) * .5 + .5);
+                float inner = r * (.43f + pulse * .07f), outer = inner + dp(4) + pulse * dp(9);
+                float x1 = cx + (float)Math.cos(a) * inner, y1 = cy + (float)Math.sin(a) * inner;
+                float x2 = cx + (float)Math.cos(a) * outer, y2 = cy + (float)Math.sin(a) * outer;
+                p.setStrokeWidth(dp(2)); p.setStrokeCap(Paint.Cap.ROUND);
                 p.setShader(new LinearGradient(x1, y1, x2, y2, new int[]{cyan, pink, accent}, null, Shader.TileMode.CLAMP));
                 canvas.drawLine(x1, y1, x2, y2, p);
             }
             p.setShader(null);
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.WHITE);
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-            p.setTextSize(dp(10));
-            canvas.drawText("PG", cx, cy + dp(4), p);
+            drawCenterLabel(canvas, cx, cy);
+        }
+
+        private void drawBars(Canvas canvas, float cx, float cy, float r, boolean neon) {
+            p.setStyle(Paint.Style.FILL); p.setColor(Color.argb(225, 17, 20, 42));
+            canvas.drawRoundRect(new RectF(cx-r, cy-r*.76f, cx+r, cy+r*.76f), dp(18), dp(18), p);
+            int count = 17; float gap = dp(2.5f), bw = (r * 1.55f - gap * (count-1)) / count;
+            for (int i=0; i<count; i++) {
+                float h = dp(8) + (float)(Math.abs(Math.sin(i*.7 + phase*.7)) * r * (neon ? .85f : .68f));
+                float x = cx - (count*bw+(count-1)*gap)/2f + i*(bw+gap);
+                p.setShader(new LinearGradient(x, cy-h/2, x, cy+h/2, neon ? new int[]{pink, accent, cyan} : new int[]{cyan, accent, pink}, null, Shader.TileMode.CLAMP));
+                canvas.drawRoundRect(new RectF(x, cy-h/2, x+bw, cy+h/2), dp(3), dp(3), p);
+            }
+            p.setShader(null);
+        }
+
+        private void drawWaveform(Canvas canvas, float cx, float cy, float r) {
+            p.setColor(Color.argb(220, 16, 20, 42));
+            canvas.drawRoundRect(new RectF(cx-r, cy-r*.72f, cx+r, cy+r*.72f), dp(18), dp(18), p);
+            android.graphics.Path wave = new android.graphics.Path();
+            for (int i=0; i<=70; i++) {
+                float x = cx-r*.82f + (2*r*.82f*i/70f);
+                float y = cy + (float)Math.sin(i*.32 + phase*.75)*r*.23f + (float)Math.sin(i*.81 - phase*.38)*r*.11f;
+                if (i==0) wave.moveTo(x,y); else wave.lineTo(x,y);
+            }
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(dp(3)); p.setStrokeCap(Paint.Cap.ROUND); p.setStrokeJoin(Paint.Join.ROUND);
+            p.setShader(new LinearGradient(cx-r, cy, cx+r, cy, new int[]{cyan, accent, pink}, null, Shader.TileMode.CLAMP));
+            canvas.drawPath(wave,p); p.setShader(null); p.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawPulse(Canvas canvas, float cx, float cy, float r) {
+            p.setColor(Color.argb(230, 18, 21, 43)); canvas.drawCircle(cx,cy,r*.88f,p);
+            p.setStyle(Paint.Style.STROKE);
+            for (int i=0;i<4;i++) {
+                float rr = r*(.28f + i*.17f) + (float)Math.sin(phase-i)*dp(2);
+                p.setStrokeWidth(dp(i==3 ? 2 : 1));
+                p.setColor(i%2==0 ? Color.argb(190,81,224,255) : Color.argb(190,255,104,195));
+                canvas.drawCircle(cx,cy,rr,p);
+            }
+            p.setStyle(Paint.Style.FILL); p.setShader(new SweepGradient(cx,cy,new int[]{accent,cyan,pink,accent},null));
+            canvas.drawCircle(cx,cy,r*(.19f + (float)Math.sin(phase)*.025f),p); p.setShader(null);
+        }
+
+        private void drawRings(Canvas canvas, float cx, float cy, float r) {
+            p.setColor(Color.argb(225,17,20,42)); canvas.drawCircle(cx,cy,r*.9f,p);
+            p.setStyle(Paint.Style.STROKE);
+            for (int i=0;i<5;i++) {
+                p.setStrokeWidth(dp(i==0 ? 3 : 1.5f));
+                p.setShader(new SweepGradient(cx,cy,new int[]{cyan,accent,pink,cyan}, phase*20+i*20));
+                float rr = r*(.25f+i*.13f) + (float)Math.sin(phase+i*.7f)*dp(2);
+                canvas.drawCircle(cx,cy,rr,p);
+            }
+            p.setShader(null); p.setStyle(Paint.Style.FILL); drawCenterLabel(canvas,cx,cy);
+        }
+
+        private void drawCenterLabel(Canvas canvas, float cx, float cy) {
+            p.setShader(null); p.setStyle(Paint.Style.FILL); p.setColor(Color.WHITE);
+            p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            p.setTextSize(dp(10)); canvas.drawText("PG", cx, cy + dp(4), p);
         }
     }
 
