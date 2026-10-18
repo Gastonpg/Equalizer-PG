@@ -50,16 +50,22 @@ public class AudioEngineService extends Service {
                 equalizer = new Equalizer(0, 0);
                 equalizer.setEnabled(true);
             }
-            if (ACTION_BAND.equals(action) && intent != null) {
+            boolean bandAction = ACTION_BAND.equals(action);
+            if (bandAction && intent != null) {
                 int index = intent.getIntExtra(EXTRA_INDEX, -1);
                 int level = intent.getIntExtra(EXTRA_LEVEL, 0);
-                if (index >= 0 && index < 10) {
-                    bandLevels[index] = (short) Math.max(-1200, Math.min(1200, level));
+                short count = equalizer.getNumberOfBands();
+                short[] range = equalizer.getBandLevelRange();
+                if (index >= 0 && index < count) {
+                    short safeLevel = (short) Math.max(range[0], Math.min(range[1], level));
+                    equalizer.setBandLevel((short) index, safeLevel);
                 }
-            } else if (ACTION_PREAMP.equals(action) && intent != null) {
-                preampMb = intent.getIntExtra(EXTRA_LEVEL, 0);
+            } else {
+                if (ACTION_PREAMP.equals(action) && intent != null) {
+                    preampMb = intent.getIntExtra(EXTRA_LEVEL, 0);
+                }
+                applyBands();
             }
-            applyBands();
             updateNotification("Activo · ecualizador del sistema");
         } catch (Throwable error) {
             updateNotification("Este dispositivo no permite ecualización global");
