@@ -80,18 +80,14 @@ public class AudioEngineService extends Service {
 
     private void applySettings() {
         if (processor == null) return;
-        DynamicsProcessing.Config config = processor.getConfig();
-        int channels = config.getChannelCount();
-        for (int ch = 0; ch < channels; ch++) {
-            DynamicsProcessing.Eq eq = config.getPostEqByChannelIndex(ch);
-            int count = Math.min(eq.getBandCount(), FREQS.length);
-            for (int i = 0; i < count; i++) {
-                eq.setBand(i, new DynamicsProcessing.EqBand(true, FREQS[i], gains[i]));
-            }
-            config.setPostEqByChannelIndex(ch, eq);
-            config.setInputGainByChannelIndex(ch, Math.max(-12f, Math.min(0f, preampMb / 100f)));
+        DynamicsProcessing.Eq eq = new DynamicsProcessing.Eq(true, true, FREQS.length);
+        for (int i = 0; i < FREQS.length; i++) {
+            eq.setBand(i, new DynamicsProcessing.EqBand(true, FREQS[i], gains[i]));
         }
-        processor.setConfig(config);
+        // Android 9 exposes live stage setters on the effect itself; Config does
+        // not expose getChannelCount() and DynamicsProcessing has no setConfig().
+        processor.setPostEqAllChannelsTo(eq);
+        processor.setInputGainAllChannelsTo(Math.max(-12f, Math.min(0f, preampMb / 100f)));
         processor.setEnabled(true);
     }
 
