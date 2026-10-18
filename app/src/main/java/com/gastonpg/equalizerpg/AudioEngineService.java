@@ -5,14 +5,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
-import android.media.audiofx.Equalizer;
+import android.media.audiofx.DynamicsProcessing;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 /**
- * First real audio-engine integration test.
- * Uses Android's output-mix Equalizer (session 0) when the device permits it.
- * This validates system audio access; a custom parametric DSP path is a later stage.
+ * Global output-mix test using Android 9's DynamicsProcessing effect.
+ * This is deliberately independent of the legacy Equalizer effect.
  */
 public class AudioEngineService extends Service {
     public static final String ACTION_START = "com.gastonpg.equalizerpg.AUDIO_START";
@@ -22,88 +22,83 @@ public class AudioEngineService extends Service {
     public static final String EXTRA_INDEX = "index";
     public static final String EXTRA_LEVEL = "level";
     private static final String CHANNEL_ID = "equalizer_pg_audio";
-    private Equalizer equalizer;
-    private short[] bandLevels;
+    private static final int NOTIFICATION_ID = 41;
+    private static final float[] FREQS = {31f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f};
+    private final float[] gains = new float[10];
+    private DynamicsProcessing processor;
     private int preampMb;
 
-    @Override
-    public void onCreate() {
+    @Override public void onCreate() {
         super.onCreate();
-        bandLevels = new short[]{-200, 100, 100, -100, 0, 0, 100, 100, 100, 0};
         createChannel();
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? ACTION_START : intent.getAction();
         if (ACTION_STOP.equals(action)) {
-            releaseEqualizer();
+            releaseProcessor();
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        startForeground(41, buildNotification("Activando ecualizador…"));
+        startForeground(NOTIFICATION_ID, buildNotification("Iniciando motor DynamicsProcessing…"));
         try {
-            if (equalizer == null) {
-                // Session 0 requests an output-mix effect. Some devices may reject it.
-                equalizer = new Equalizer(0, 0);
-                equalizer.setEnabled(true);
-            }
-            boolean bandAction = ACTION_BAND.equals(action);
-            if (bandAction && intent != null) {
+            if (processor == null) createProcessor();
+            if (ACTION_BAND.equals(action) && intent != null) {
                 int index = intent.getIntExtra(EXTRA_INDEX, -1);
-                int level = intent.getIntExtra(EXTRA_LEVEL, 0);
-                short count = equalizer.getNumberOfBands();
-                short[] range = equalizer.getBandLevelRange();
-                if (index >= 0 && index < count) {
-                    short safeLevel = (short) Math.max(range[0], Math.min(range[1], level));
-                    equalizer.setBandLevel((short) index, safeLevel);
-                }
-            } else {
-                if (ACTION_PREAMP.equals(action) && intent != null) {
-                    preampMb = intent.getIntExtra(EXTRA_LEVEL, 0);
-                }
-                applyBands();
+                int millibels = intent.getIntExtra(EXTRA_LEVEL, 0);
+                if (index >= 0 && index < gains.length) gains[index] = Math.max(-12f, Math.min(12f, millibels / 100f));
+            } else if (ACTION_PREAMP.equals(action) && intent != null) {
+                preampMb = intent.getIntExtra(EXTRA_LEVEL, 0);
             }
-            updateNotification("Activo · ecualizador del sistema");
+            applySettings();
+            updateNotification("Motor DynamicsProcessing activo · salida global solicitada");
+            Log.i("EqualizerPG", "DynamicsProcessing enabled on session 0");
         } catch (Throwable error) {
-            updateNotification("Este dispositivo no permite ecualización global");
-            android.util.Log.e("EqualizerPG", "No se pudo iniciar el efecto de salida", error);
-            releaseEqualizer();
+            String detail = error.getClass().getSimpleName() + (error.getMessage() == null ? "" : ": " + error.getMessage());
+            updateNotification("No compatible: " + detail);
+            Log.e("EqualizerPG", "No se pudo crear/aplicar DynamicsProcessing en salida global", error);
+            releaseProcessor();
             stopSelf();
         }
         return START_STICKY;
     }
 
-    private void applyBands() {
-        if (equalizer == null) return;
-        short count = equalizer.getNumberOfBands();
-        if (count <= 0) return;
-        int[] centers = {31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
-        short[] rangeDb = equalizer.getBandLevelRange();
-        for (short b = 0; b < count; b++) {
-            int[] range = equalizer.getBandFreqRange(b);
-            int nativeCenterHz = (range[0] + range[1]) / 2000;
-            int nearestIndex = 0;
-            double best = Double.MAX_VALUE;
-            for (int i = 0; i < centers.length; i++) {
-                double distance = Math.abs(Math.log(Math.max(1, nativeCenterHz) / (double) centers[i]));
-                if (distance < best) {
-                    best = distance;
-                    nearestIndex = i;
-                }
-            }
-            int level = Math.max(rangeDb[0], Math.min(rangeDb[1], bandLevels[nearestIndex]));
-            equalizer.setBandLevel(b, (short) level);
+    private void createProcessor() {
+        DynamicsProcessing.Config.Builder builder = new DynamicsProcessing.Config.Builder(
+                DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                2, false, 0, false, 0, true, FREQS.length, false);
+        DynamicsProcessing.Eq eq = new DynamicsProcessing.Eq(true, true, FREQS.length);
+        for (int i = 0; i < FREQS.length; i++) {
+            eq.setBand(i, new DynamicsProcessing.EqBand(true, FREQS[i], gains[i]));
         }
-        // Android's Equalizer effect has no standard preamp control; retained for DSP integration.
+        builder.setPostEqAllChannelsTo(eq);
+        processor = new DynamicsProcessing(0, 0, builder.build());
+        processor.setEnabled(true);
+    }
+
+    private void applySettings() {
+        if (processor == null) return;
+        DynamicsProcessing.Config config = processor.getConfig();
+        int channels = config.getChannelCount();
+        for (int ch = 0; ch < channels; ch++) {
+            DynamicsProcessing.Eq eq = config.getPostEqByChannelIndex(ch);
+            int count = Math.min(eq.getBandCount(), FREQS.length);
+            for (int i = 0; i < count; i++) {
+                eq.setBand(i, new DynamicsProcessing.EqBand(true, FREQS[i], gains[i]));
+            }
+            config.setPostEqByChannelIndex(ch, eq);
+            config.setInputGainByChannelIndex(ch, Math.max(-12f, Math.min(0f, preampMb / 100f)));
+        }
+        processor.setConfig(config);
+        processor.setEnabled(true);
     }
 
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Equalizer PG", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Estado del procesamiento de audio");
+            channel.setDescription("Estado del motor de audio");
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
@@ -112,30 +107,26 @@ public class AudioEngineService extends Service {
     private Notification buildNotification(String status) {
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
-        return builder.setContentTitle("Equalizer PG")
-                .setContentText(status)
-                .setSmallIcon(R.drawable.ic_notification_pg)
-                .setOngoing(true)
-                .build();
+        return builder.setContentTitle("Equalizer PG").setContentText(status)
+                .setSmallIcon(R.drawable.ic_notification_pg).setOngoing(true).build();
     }
 
     private void updateNotification(String status) {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (manager != null) manager.notify(41, buildNotification(status));
+        if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification(status));
     }
 
-    private void releaseEqualizer() {
-        if (equalizer != null) {
-            try { equalizer.setEnabled(false); } catch (Throwable ignored) {}
-            try { equalizer.release(); } catch (Throwable ignored) {}
-            equalizer = null;
+    private void releaseProcessor() {
+        if (processor != null) {
+            try { processor.setEnabled(false); } catch (Throwable ignored) {}
+            try { processor.release(); } catch (Throwable ignored) {}
+            processor = null;
         }
     }
 
     @Override public void onDestroy() {
-        releaseEqualizer();
+        releaseProcessor();
         super.onDestroy();
     }
-
     @Override public IBinder onBind(Intent intent) { return null; }
 }
