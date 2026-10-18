@@ -282,9 +282,18 @@ public class MainActivity extends Activity {
                     @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                         short level = (short) (nativeMinLevel + progress);
                         val.setText(String.format(java.util.Locale.US, "%+.1f", level / 100f));
-                        if (fromUser && systemEqualizer != null) {
-                            try { systemEqualizer.setBandLevel(bandId, level); }
-                            catch (Exception e) { Toast.makeText(MainActivity.this, "El sistema rechazó este ajuste", Toast.LENGTH_SHORT).show(); }
+                        if (fromUser) {
+                            if (systemEqualizer != null) {
+                                try { systemEqualizer.setBandLevel(bandId, level); }
+                                catch (Exception e) {
+                                    Toast.makeText(MainActivity.this, "El sistema rechazó este ajuste", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                            // Send every user adjustment to the persistent audio service too.
+                            // The service owns a separate Equalizer instance on the TV Box.
+                            if (enabled) {
+                                startAudioEngine(AudioEngineService.ACTION_BAND, bandId, level);
+                            }
                         }
                     }
                     @Override public void onStartTrackingTouch(SeekBar bar) {}
